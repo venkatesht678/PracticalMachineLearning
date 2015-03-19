@@ -1,0 +1,115 @@
+---
+title: "Practical Machine Learning"
+author: "Venkatesh"
+date: "Sunday, Feb 22, 2015"
+output:
+  html_document:
+    theme: spacelab
+---
+# Background Summary 
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement – a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, the goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. 
+
+### Libraries
+The libraries that are used in this code.
+```{r}
+library(caret)
+library(kernlab)
+library(corrplot)
+library(randomForest)
+library(knitr)
+```
+```{r setoptions, echo = FALSE}
+
+```
+
+### Loading data and preprocessing the data
+Two csv files that contains test and training data were downloaded into a csvdata folder in the current directory. 
+
+```{r, eval = FALSE}
+# a csvdata folder is created if the one doesnot exits
+if (!file.exists("csvdata")) {dir.create("csvdata")}
+
+# file URL and destination file
+f1 <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+d1 <- "./csvdata/pml-training.csv"
+f2 <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+d2 <- "./csvdata/pml-testing.csv"
+
+# To download two csv files
+download.file(f1, destfile = d1)
+download.file(f2, destfile = d2)
+dateDownloaded <- date()
+```
+
+The training data is loaded into R using the below command.
+
+```{r}
+# read the csv file for training 
+training_data<- read.csv("./csvdata/pml-training.csv", na.strings= c("NA",""," "))
+```
+
+The NA values which creates noises were removed at first and also the identifiers for the experiment were also removed by removing the first eight columns.
+
+```{r}
+# The data is cleaned by removing NAs
+training_data_NAs <- apply(training_data, 2, function(x) {sum(is.na(x))})
+training_data_clean <- training_data[,which(training_data_NAs == 0)]
+
+# The identifiers such as name, timestamps were removed
+training_data_clean <- training_data_clean[8:length(training_data_clean)]
+```
+
+### Here comes the model creation
+Now the test data is now splitted in the ratio 70:30 which contains training and cross validation sets for training the model and testing against it.
+
+```{r}
+# This splits the testing data into the ratio of 70:30
+inTrain <- createDataPartition(y = training_data_clean$classe, p = 0.7, list = FALSE)
+training <- training_data_clean[inTrain, ]
+crossval <- training_data_clean[-inTrain, ]
+```
+
+To predict classification random forest has been selected. To see the relationship strength among variable a correalation plot was produced.
+
+```{r, fig.height = 6, fig.width = 8}
+# plot a correlation matrix
+correlMatrix <- cor(training[, -length(training)])
+corrplot(correlMatrix, order = "FPC", method = "square", type = "lower", tl.cex = 0.8,  tl.col = rgb(0, 0, 0))
+```
+Figure: correlation plot.
+
+```{r}
+model <- randomForest(classe ~ ., data = training)
+model
+```
+
+The model has a very small Out-Of-Bag error rate of .56%.
+
+### Cross-validation
+For determining the accuracy of the model the results were kept in a confusion matrix along with the actual classification.
+
+```{r}
+# crossvalidaating the model using 30% of data
+predictCrossVal <- predict(model, crossval)
+confusionMatrix(crossval$classe, predictCrossVal)
+```
+
+The model produced a 99.3% prediction accuracy. Again, the model showed that it is adequeate to predict new data.
+
+### Predictions
+To predict the classifications of the 20 results of this new data a separate data set is loaded into R and cleaned for prediction.
+
+```{r}
+# final testing data is also done by the same procedure
+test_data <- read.csv("./csvdata/pml-testing.csv", na.strings= c("NA",""," "))
+test_data_NAs <- apply(test_data, 2, function(x) {sum(is.na(x))})
+test_data_clean <- test_data[,which(test_data_NAs == 0)]
+test_data_clean <- test_data_clean[8:length(test_data_clean)]
+
+# To predict classes of test set
+predictTest <- predict(model, test_data_clean)
+predictTest
+```
+
+### Conclusions
+It is possible to predict by using lot of information given in the data with a greater accuracy on how a person is preforming an excercise in an  relatively simplified manner. 
